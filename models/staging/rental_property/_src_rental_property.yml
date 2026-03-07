@@ -3,7 +3,76 @@ version: 2
 sources:
   - name: rental_property_management
     database: raw
+    description: "Raw source tables for the rental property management system."
     tables:
-      - name: amenities_changelog
-      - name: calendar
       - name: listings
+        description: "One row per property listing. Contains host info, property details, pricing, and review aggregates."
+        columns:
+          - name: id
+            description: "Unique ID for this listing. Primary Key."
+          - name: name
+            description: "Display name of the listing."
+          - name: host_id
+            description: "Unique ID for the Host who owns this property."
+          - name: host_name
+            description: "Display name of the Host."
+          - name: host_since
+            description: "Datetime when the Host signed up."
+          - name: host_location
+            description: "Where the Host is based."
+          - name: host_verifications
+            description: 'JSON array of methods the Host can use to verify (e.g. ["email","phone"]).'
+          - name: neighborhood
+            description: "The neighborhood where this listing is located."
+          - name: property_type
+            description: "Description of the type of property (e.g. Entire home, Private room)."
+          - name: room_type
+            description: "Description of the type of room available."
+          - name: accommodates
+            description: "Number of guests this room can accommodate."
+          - name: bathrooms_text
+            description: "Number and types of bathrooms available (e.g. '1 bath', '1.5 shared baths')."
+          - name: bedrooms
+            description: "Number of bedrooms available for use."
+          - name: beds
+            description: "Number of beds available for use."
+          - name: amenities
+            description: "JSON array of amenities available for guests."
+          - name: price
+            description: "USD price of this listing as of the start of the CALENDAR date range. Stored as a VARCHAR with a leading '$'."
+          - name: number_of_reviews
+            description: "Total number of reviews this listing has ever received."
+          - name: first_review
+            description: "Date of the first review this listing received (VARCHAR)."
+          - name: last_review
+            description: "Date of the most recent review this listing received (VARCHAR)."
+          - name: review_scores_rating
+            description: "Average review score of this listing (VARCHAR, parseable as numeric)."
+
+      - name: calendar
+        description: "One row per listing per date. Tracks availability, price, and booking constraints. Composite PK: (listing_id, date)."
+        columns:
+          - name: listing_id
+            description: "Foreign key to LISTINGS.ID. Part of the composite Primary Key."
+          - name: date
+            description: "Date of availability this row describes. Part of the composite Primary Key."
+          - name: available
+            description: "Contains 't' if the property is available on this date; 'f' if not."
+          - name: reservation_id
+            description: "Unique ID for the reservation on that DATE. NULL if there was no reservation. Foreign key."
+          - name: price
+            description: "USD price to rent this property on DATE. Stored as a VARCHAR with a leading '$'."
+          - name: minimum_nights
+            description: "Minimum number of consecutive nights that must be booked for this property."
+          - name: maximum_nights
+            description: "Maximum number of consecutive nights that may be booked for this property."
+
+      - name: amenities_changelog
+        description: "Audit log of amenities changes per listing. One row per listing per change event. Composite PK: (listing_id, change_at)."
+        columns:
+          - name: listing_id
+            description: "Foreign key to LISTINGS.ID. Part of the composite Primary Key."
+          - name: change_at
+            description: "Datetime when the amenities list changed. Part of the composite Primary Key."
+          - name: amenities
+            description: "JSON array of amenities available as of the change_at timestamp."

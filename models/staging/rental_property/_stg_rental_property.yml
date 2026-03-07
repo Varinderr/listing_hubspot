@@ -1,0 +1,164 @@
+version: 2
+
+models:
+
+  - name: stg_rental_property__listings
+    description: "Cleaned and typed listing records. One row per listing."
+    columns:
+      - name: listing_id
+        description: "Unique ID for this listing. Primary Key."
+        tests:
+          - unique
+          - not_null
+
+      - name: host_id
+        description: "Unique ID for the Host who owns this property."
+        tests:
+          - not_null
+
+      - name: host_name
+        description: "Display name of the Host."
+        tests:
+          - not_null
+
+      - name: host_since_date
+        description: "Date the Host signed up."
+        tests:
+          - not_null
+
+      - name: host_location
+        description: "Where the Host is based."
+
+      - name: host_verifications
+        description: "JSON array of Host verification methods."
+
+      - name: listing_name
+        description: "Display name of the listing."
+        tests:
+          - not_null
+
+      - name: neighborhood
+        description: "The neighborhood where this listing is located."
+
+      - name: property_type
+        description: "Type of property (e.g. Entire home, Private room)."
+        tests:
+          - not_null
+
+      - name: room_type
+        description: "Type of room available."
+        tests:
+          - not_null
+
+      - name: accommodates
+        description: "Number of guests this room can accommodate."
+        tests:
+          - not_null
+
+      - name: bathrooms_text
+        description: "Number and types of bathrooms available."
+
+      - name: bedrooms
+        description: "Number of bedrooms available for use."
+
+      - name: beds
+        description: "Number of beds available for use."
+
+      - name: amenities
+        description: "JSON array of amenities available for guests."
+
+      - name: listing_price
+        description: "Price of this listing, cast to numeric after stripping currency symbols."
+        tests:
+          - not_null
+
+      - name: number_of_reviews
+        description: "Total number of reviews this listing has ever received."
+        tests:
+          - not_null
+
+      - name: first_review_date
+        description: "Date of the first review this listing received."
+
+      - name: last_review_date
+        description: "Date of the most recent review this listing received."
+
+      - name: review_scores_rating
+        description: "Average review score of this listing, cast to numeric."
+
+  - name: stg_rental_property__calendar
+    description: "Daily availability and pricing for each listing. One row per listing per date."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - listing_id
+            - calendar_date
+    columns:
+      - name: listing_id
+        description: "Foreign key to stg_rental_property__listings.listing_id. Part of the composite Primary Key."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_rental_property__listings')
+              field: listing_id
+
+      - name: calendar_date
+        description: "Date of availability. Part of the composite Primary Key."
+        tests:
+          - not_null
+
+      - name: reservation_id
+        description: "Unique ID for the reservation on this date. NULL if no reservation existed."
+
+      - name: is_available
+        description: "True if the property is available on this date; False if not."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: calendar_price
+        description: "USD price to rent the property on this date, cast to numeric."
+        tests:
+          - not_null
+
+      - name: minimum_nights
+        description: "Minimum consecutive nights required for a booking."
+        tests:
+          - not_null
+
+      - name: maximum_nights
+        description: "Maximum consecutive nights allowed for a booking."
+        tests:
+          - not_null
+
+  - name: stg_rental_property__amenities_changelog
+    description: "Audit log of amenities changes per listing. One row per listing per change event."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - listing_id
+            - changed_at
+    columns:
+      - name: listing_id
+        description: "Foreign key to stg_rental_property__listings.listing_id. Part of the composite Primary Key."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_rental_property__listings')
+              field: listing_id
+
+      - name: changed_at
+        description: "Full datetime when the amenities list changed. Part of the composite Primary Key."
+        tests:
+          - not_null
+
+      - name: change_date
+        description: "Date-only convenience field derived from changed_at."
+        tests:
+          - not_null
+
+      - name: amenities
+        description: "JSON array of amenities available as of the changed_at timestamp."
+        tests:
+          - not_null
