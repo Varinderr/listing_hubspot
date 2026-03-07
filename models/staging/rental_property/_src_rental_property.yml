@@ -1,0 +1,9 @@
+version: 2
+
+sources:
+  - name: rental_property_management
+    database: raw
+    tables:
+      - name: amenities_changelog
+      - name: calendar
+      - name: listings
