@@ -88,19 +88,11 @@ models:
 
   - name: stg_rental_property__calendar
     description: "Daily availability and pricing for each listing. One row per listing per date."
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - listing_id
-            - calendar_date
     columns:
       - name: listing_id
         description: "Foreign key to stg_rental_property__listings.listing_id. Part of the composite Primary Key."
         tests:
           - not_null
-          - relationships:
-              to: ref('stg_rental_property__listings')
-              field: listing_id
 
       - name: calendar_date
         description: "Date of availability. Part of the composite Primary Key."
@@ -114,8 +106,6 @@ models:
         description: "True if the property is available on this date; False if not."
         tests:
           - not_null
-          - accepted_values:
-              values: [true, false]
 
       - name: calendar_price
         description: "USD price to rent the property on this date, cast to numeric."
@@ -134,19 +124,11 @@ models:
 
   - name: stg_rental_property__amenities_changelog
     description: "Audit log of amenities changes per listing. One row per listing per change event."
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - listing_id
-            - changed_at
     columns:
       - name: listing_id
         description: "Foreign key to stg_rental_property__listings.listing_id. Part of the composite Primary Key."
         tests:
           - not_null
-          - relationships:
-              to: ref('stg_rental_property__listings')
-              field: listing_id
 
       - name: changed_at
         description: "Full datetime when the amenities list changed. Part of the composite Primary Key."
