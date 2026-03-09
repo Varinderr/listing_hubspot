@@ -20,7 +20,7 @@ with
             cast(bedrooms as integer) as bedrooms,
             beds,
             amenities,
-            cast(replace(replace(price, '$', ''), ',', '') as numeric) as listing_price,
+            {{clean_price('price')}} as listing_price,
             number_of_reviews,
             date(first_review) as first_review_date,
             date(last_review) as last_review_date,
