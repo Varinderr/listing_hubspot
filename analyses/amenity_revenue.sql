@@ -1,22 +1,32 @@
 with
-    monthly_revenue as (
+    daily as (
         select
-            date_trunc('month', calendar_date) as revenue_month,
+            date_trunc('month', calendar_date)              as revenue_month,
             case
-                when
-                    array_to_string(amenities_at_timestamp, ',')
-                    ilike '%Air conditioning%'
-                then 'Has AC'
+                when {{ has_amenity('Air conditioning') }}  then 'Has AC'
                 else 'No AC'
-            end as ac_status,
-            sum(daily_revenue) as total_revenue
+            end                                             as ac_status,
+            daily_revenue
         from {{ ref("fct_listing_daily_details") }}
-        group by all
+        where is_reserved = true
+    ),
+
+    monthly as (
+        select
+            revenue_month,
+            ac_status,
+            sum(daily_revenue) as total_revenue
+        from daily
+        group by 1, 2
     )
 
 select
     revenue_month,
     ac_status,
-    total_revenue / sum(total_revenue) over (partition by revenue_month) * 100 as revenue_percentage
-from monthly_revenue
-order by 1, 2
+    total_revenue,
+    round(
+        total_revenue / nullif(sum(total_revenue) over (partition by revenue_month), 0) * 100,
+        1
+    ) as revenue_pct
+from monthly
+order by revenue_month, ac_status

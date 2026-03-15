@@ -5,16 +5,31 @@
 }}
 
 with
-    updated_data as (
-        select *,
-            case when reservation_id = 'NULL' then false else true end is_reserved,
+    source as (
+        select * from {{ ref("stg_rental_property__calendar") }}
+    ),
+
+    enriched as (
+        select
+            listing_id,
+            calendar_date,
+            reservation_id,
+            is_available,
+            calendar_price,
+            minimum_nights,
+            maximum_nights,
+
+            -- A date is reserved when a reservation_id is present
+            (reservation_id is not null) as is_reserved,
+
+            -- Revenue only accrues on reserved days
             case
-            when reservation_id is not null
-            then calendar_price
-            else 0
+                when reservation_id is not null
+                then calendar_price
+                else 0
             end as daily_revenue
-        from
-            {{ ref("stg_rental_property__calendar") }}
+        from source
     )
 
-select * from updated_data
+select * from enriched
+

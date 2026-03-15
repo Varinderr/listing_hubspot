@@ -1,6 +1,7 @@
 {{
     config(
-        schema = 'int_rental_property'
+        schema = 'int_rental_property',
+        materialized = 'ephemeral'    
     )
 }}
 

@@ -1,0 +1,186 @@
+version: 2
+
+models:
+
+  - name: fct_listing_daily_details
+    description: >
+      Core reporting fact table at the listing/day grain. Joins calendar availability,
+      listing attributes, and point-in-time amenity snapshots to produce a single
+      denormalized surface for period-over-period revenue, occupancy, and amenity analysis.
+
+      Key design decisions:
+        - Listing attributes (neighborhood, price, room_type etc.) are joined from
+          dim_listings via a range join — they reflect what the listing looked like
+          ON that specific date, not today's state. This is the key difference from
+          joining the staging model directly.
+        - Amenities are joined via a second SCD2 range join (int_amenities_history)
+          so amenity presence also reflects the correct point in time.
+        - daily_revenue is zero on non-reserved days, making SUM(daily_revenue) safe
+          without additional filtering.
+        - is_blocked_by_host distinguishes owner-blocked dates from open availability,
+          which is important for accurate occupancy rate calculations.
+
+      Grain: one row per (listing_id, calendar_date).
+    columns:
+      - name: fact_id
+        description: "Surrogate key: hash of (listing_id, calendar_date)."
+        tests:
+          - unique
+          - not_null
+      - name: calendar_date
+        description: "The calendar date this row represents."
+        tests:
+          - not_null
+      - name: listing_id
+        description: "Foreign key to the listing."
+        tests:
+          - not_null
+      - name: listing_version_id
+        description: >
+          Foreign key to dim_listings.listing_version_id. Identifies which version of
+          the listing was active on this calendar_date. Enables a direct join to
+          dim_listings without a range join: JOIN dim_listings USING (listing_version_id).
+      - name: listing_name
+        description: "Display name of the listing."
+      - name: neighborhood
+        description: "Neighborhood where the listing is located."
+      - name: property_type
+        description: "Type of property (e.g. Entire home, Private room)."
+      - name: room_type
+        description: "Room type descriptor."
+      - name: accommodates
+        description: "Number of guests this listing can accommodate."
+      - name: bedrooms
+        description: "Number of bedrooms."
+      - name: beds
+        description: "Number of beds."
+      - name: review_scores_rating
+        description: "Average review score at the time of this listing version."
+      - name: listed_price
+        description: >
+          The listing's base price at this version (from dim_listings). This is the
+          owner-set price as of the snapshot, which may differ from price_on_day
+          (the actual calendar price, which can vary day to day). Useful for
+          understanding how an owner's baseline changed over time.
+      - name: price_on_day
+        description: "USD price to rent this listing on calendar_date."
+        tests:
+          - not_null
+      - name: minimum_nights
+        description: "Minimum consecutive nights required for a booking on this date."
+      - name: maximum_nights
+        description: "Maximum consecutive nights allowed for a booking on this date."
+      - name: is_available
+        description: "True if the listing is available for new bookings on this date."
+        tests:
+          - not_null
+      - name: is_reserved
+        description: "True if a reservation exists on this date."
+        tests:
+          - not_null
+      - name: reservation_id
+        description: "The reservation ID if reserved; NULL otherwise."
+      - name: daily_revenue
+        description: "Revenue earned on this date. 0 when not reserved."
+        tests:
+          - not_null
+      - name: is_blocked_by_host
+        description: >
+          True when is_available=false AND is_reserved=false.
+          Indicates the owner manually blocked the date (not a guest booking).
+          Useful for computing 'true' occupancy rates that exclude host-blocked days
+          from the denominator.
+        tests:
+          - not_null
+      - name: amenity_version_id
+        description: >
+          Foreign key to int_amenities_history. NULL when no amenity changelog
+          entry covers this date (listing predates the changelog or no changes recorded).
+      - name: amenities_at_timestamp
+        description: >
+          VARIANT JSON array of amenities active on calendar_date, derived from the
+          SCD2 range join against int_amenities_history.
+          Query pattern (Snowflake): array_contains('Air conditioning'::variant, amenities_at_timestamp)
+          NULL when no changelog record covers this date.
+
+  - name: dim_listings
+    description: >
+      SCD Type 2 dimension for listing attributes, sourced from the snap_listings
+      dbt snapshot. Tracks changes to key listing fields (neighborhood, price, room type,
+      accommodates, etc.) over time so historical revenue and occupancy analysis
+      reflects what the listing looked like at that point in time — not today's state.
+
+      Grain: one row per (listing_id, version). Current version has is_current = true
+      and valid_to = NULL. Superseded versions have a non-null valid_to.
+
+      Typical join to the fact table:
+        ON  f.listing_id    = d.listing_id
+        AND f.calendar_date >= d.valid_from
+        AND f.calendar_date <  coalesce(d.valid_to, current_date + 1)
+        AND d.is_current = true   -- drop this line for full point-in-time joins
+
+      Note: because the source dataset is a static CSV extract, all listings will
+      initially show a single version (is_current = true). Subsequent dbt snapshot
+      runs will begin tracking changes from that baseline forward.
+    columns:
+      - name: listing_version_id
+        description: "Surrogate key: hash of (listing_id, valid_from). Unique per version."
+        tests:
+          - unique
+          - not_null
+      - name: listing_id
+        description: "Natural key for the listing."
+        tests:
+          - not_null
+      - name: valid_from
+        description: "Date this version of the listing became active."
+        tests:
+          - not_null
+      - name: valid_to
+        description: "Date this version was superseded. NULL means this is the current version."
+      - name: is_current
+        description: "True if this is the active/current version of the listing."
+        tests:
+          - not_null
+      - name: listing_name
+        description: "Display name of the listing at this point in time."
+      - name: neighborhood
+        description: "Neighborhood at this point in time. Tracked for change."
+        tests:
+          - not_null
+      - name: property_type
+        description: "Property type at this point in time."
+      - name: room_type
+        description: "Room type at this point in time."
+      - name: accommodates
+        description: "Guest capacity at this point in time."
+      - name: bathrooms_text
+        description: "Bathroom description at this point in time."
+      - name: bedrooms
+        description: "Bedroom count at this point in time."
+      - name: beds
+        description: "Bed count at this point in time."
+      - name: listing_price
+        description: "Listed price at this point in time. Tracked for change."
+      - name: host_id
+        description: "Host who owned this listing during this version."
+      - name: host_name
+        description: "Host display name during this version."
+      - name: host_since_date
+        description: "Date the host signed up (stable — does not trigger a version)."
+      - name: host_location
+        description: "Host location at this point in time. Tracked for change."
+      - name: host_verifications
+        description: "Host verification methods at this point in time. Tracked for change."
+      - name: number_of_reviews
+        description: "Review count at snapshot time. Informational — not used in change detection."
+      - name: first_review_date
+        description: "Date of first review at snapshot time."
+      - name: last_review_date
+        description: "Date of most recent review at snapshot time."
+      - name: review_scores_rating
+        description: "Average review score at snapshot time."
+      - name: snapshot_updated_at
+        description: "Timestamp when dbt last wrote or updated this row."
+        tests:
+          - not_null
