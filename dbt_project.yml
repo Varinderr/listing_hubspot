@@ -36,7 +36,22 @@ clean-targets:         # directories to be removed by `dbt clean`
 # using the `{{ config(...) }}` macro.
 
 models:
-  my_new_project:
-    # Applies to all files under models/example/
-    example:
+  +persist_docs:
+    relation: true
+    columns: true
+
+  listing_hubspot:
+    staging:
+      +materialized: view
+      +schema: staging_rental_property
+    intermediate:
+      +materialized: ephemeral
+      +schema: int_rental_property
+    mart:
       +materialized: table
+      +schema: edw_rental_property
+
+snapshots:
+  listing_hubspot:
+    +target_schema: snapshots
+    +invalidate_hard_deletes: true
