@@ -72,6 +72,10 @@ sources:
         columns:
           - name: listing_id
             description: "Foreign key to LISTINGS.ID. Part of the composite Primary Key."
+            data_tests:
+              - not_null:
+                  config:
+                    severity: warn
           - name: change_at
             description: "Datetime when the amenities list changed. Part of the composite Primary Key."
           - name: amenities

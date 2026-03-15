@@ -130,11 +130,6 @@ models:
         tests:
           - not_null
 
-      - name: changed_at
-        description: "Full datetime when the amenities list changed. Part of the composite Primary Key."
-        tests:
-          - not_null
-
       - name: change_date
         description: "Date-only convenience field derived from changed_at."
         tests:

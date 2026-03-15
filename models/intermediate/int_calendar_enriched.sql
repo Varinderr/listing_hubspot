@@ -1,6 +1,7 @@
 {{
     config(
-        schema = 'int_rental_property'
+        schema = 'int_rental_property',
+        materialized = 'ephemeral'    
     )
 }}
 
@@ -18,10 +19,8 @@ with
             calendar_price,
             minimum_nights,
             maximum_nights,
-
             -- A date is reserved when a reservation_id is present
             (reservation_id is not null) as is_reserved,
-
             -- Revenue only accrues on reserved days
             case
                 when reservation_id is not null
@@ -32,4 +31,3 @@ with
     )
 
 select * from enriched
-

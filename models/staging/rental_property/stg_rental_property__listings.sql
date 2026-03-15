@@ -1,7 +1,11 @@
 {{ config(schema="staging_rental_property") }}
 
 with
-    source as (select * from {{ source("rental_property_management", "listings") }}),
+    source as (
+        select *
+        from {{ source("rental_property_management", "listings") }}
+        where id is not null
+    ),
 
     renamed as (
         select
@@ -20,7 +24,7 @@ with
             cast(bedrooms as integer) as bedrooms,
             beds,
             amenities,
-            {{clean_price('price')}} as listing_price,
+            {{ clean_price("price") }} as listing_price,
             number_of_reviews,
             date(first_review) as first_review_date,
             date(last_review) as last_review_date,
